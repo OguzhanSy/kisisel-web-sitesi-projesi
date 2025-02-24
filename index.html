@@ -391,10 +391,12 @@
         .game-container {
             max-width: 400px;
             margin: 20px auto;
-            background: rgba(0, 0, 0, 0.3);
+            background: rgba(0, 0, 0, 0.8);
             border: 1px solid var(--accent);
             border-radius: 10px;
             overflow: hidden;
+            box-shadow: 0 0 30px rgba(0, 255, 157, 0.3);
+            transform: perspective(1000px) rotateX(5deg);
         }
 
         #gameCanvas {
@@ -595,18 +597,92 @@
             ctx.fillStyle = "#000";
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             
-            for(let i = 0; i < snake.length; i++) {
-                ctx.fillStyle = i === 0 ? "#00ff9d" : "#00b36b";
-                ctx.fillRect(snake[i].x, snake[i].y, box-2, box-2);
+            // Grid çizgileri
+            ctx.strokeStyle = "rgba(0, 255, 157, 0.1)";
+            for(let i = 0; i < canvas.width; i += box) {
+                ctx.beginPath();
+                ctx.moveTo(i, 0);
+                ctx.lineTo(i, canvas.height);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(0, i);
+                ctx.lineTo(canvas.width, i);
+                ctx.stroke();
             }
             
-            ctx.fillStyle = "#ff0000";
-            ctx.fillRect(food.x, food.y, box-2, box-2);
+            // 3D yılan çizimi
+            for(let i = 0; i < snake.length; i++) {
+                const gradient = ctx.createLinearGradient(
+                    snake[i].x, snake[i].y,
+                    snake[i].x + box, snake[i].y + box
+                );
+                
+                if(i === 0) {
+                    gradient.addColorStop(0, "#00ff9d");
+                    gradient.addColorStop(0.5, "#00d683");
+                    gradient.addColorStop(1, "#00b36b");
+                    // 3D efekt için gölge
+                    ctx.shadowColor = "#00ff9d";
+                    ctx.shadowBlur = 15;
+                } else {
+                    gradient.addColorStop(0, "#00b36b");
+                    gradient.addColorStop(0.5, "#009458");
+                    gradient.addColorStop(1, "#007a47");
+                    ctx.shadowBlur = 5;
+                }
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                // Yılan parçalarını küçült
+                ctx.roundRect(snake[i].x + 2, snake[i].y + 2, box-4, box-4, 5);
+                ctx.fill();
+            }
+            ctx.shadowBlur = 0;
+
+            // Elma çizimi
+            function drawApple(x, y) {
+                // Elma gövdesi
+                ctx.beginPath();
+                ctx.fillStyle = "#ff0000";
+                ctx.arc(x + box/2, y + box/2, box/3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Parlama efekti
+                const shine = ctx.createRadialGradient(
+                    x + box/2 - 2, y + box/2 - 2, 1,
+                    x + box/2, y + box/2, box/3
+                );
+                shine.addColorStop(0, "rgba(255, 255, 255, 0.8)");
+                shine.addColorStop(0.3, "rgba(255, 255, 255, 0)");
+                ctx.fillStyle = shine;
+                ctx.arc(x + box/2, y + box/2, box/3, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Sap
+                ctx.beginPath();
+                ctx.strokeStyle = "#553311";
+                ctx.lineWidth = 2;
+                ctx.moveTo(x + box/2, y + box/3);
+                ctx.lineTo(x + box/2, y + box/4);
+                ctx.stroke();
+                
+                // Yaprak
+                ctx.beginPath();
+                ctx.fillStyle = "#33aa33";
+                ctx.ellipse(x + box/2 + 3, y + box/4, 4, 2, Math.PI/4, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // Elmayı çiz
+            drawApple(food.x, food.y);
             
             // Skor gösterimi
             ctx.fillStyle = "#fff";
-            ctx.font = "20px Arial";
+            ctx.font = "bold 20px Arial";
+            ctx.shadowColor = "#00ff9d";
+            ctx.shadowBlur = 10;
             ctx.fillText("Score: " + score, 10, 30);
+            ctx.shadowBlur = 0;
             
             let snakeX = snake[0].x;
             let snakeY = snake[0].y;
@@ -618,6 +694,7 @@
             
             if(snakeX === food.x && snakeY === food.y) {
                 score++;
+                eatEffect(food.x, food.y);
                 createFood();
             } else {
                 snake.pop();
@@ -698,6 +775,66 @@
                 game = setInterval(drawGame, 150);
                 isPaused = false;
             }
+        }
+
+        // Yemek yeme efekti
+        function eatEffect(x, y) {
+            const particles = [];
+            const particleCount = 8;
+            
+            for(let i = 0; i < particleCount; i++) {
+                particles.push({
+                    x: x + box/2,
+                    y: y + box/2,
+                    dx: (Math.random() - 0.5) * 4,
+                    dy: (Math.random() - 0.5) * 4,
+                    radius: Math.random() * 3 + 1,
+                    alpha: 1
+                });
+            }
+            
+            function drawParticles() {
+                particles.forEach((p, index) => {
+                    p.x += p.dx;
+                    p.y += p.dy;
+                    p.alpha -= 0.02;
+                    
+                    if(p.alpha > 0) {
+                        ctx.beginPath();
+                        ctx.fillStyle = `rgba(255, 0, 0, ${p.alpha})`;
+                        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                });
+                
+                if(particles.some(p => p.alpha > 0)) {
+                    requestAnimationFrame(drawParticles);
+                }
+            }
+            
+            drawParticles();
+        }
+
+        // Game Over ekranını güncelle
+        function gameOver() {
+            ctx.fillStyle = "rgba(0, 0, 0, 0.8)";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            ctx.fillStyle = "#ff0000";
+            ctx.font = "bold 40px Arial";
+            ctx.shadowColor = "#ff0000";
+            ctx.shadowBlur = 15;
+            ctx.textAlign = "center";
+            ctx.fillText("Game Over!", canvas.width/2, canvas.height/2 - 30);
+            
+            ctx.fillStyle = "#fff";
+            ctx.font = "25px Arial";
+            ctx.shadowColor = "#00ff9d";
+            ctx.fillText(`Score: ${score}`, canvas.width/2, canvas.height/2 + 20);
+            
+            ctx.font = "15px Arial";
+            ctx.fillText("Press Start to play again", canvas.width/2, canvas.height/2 + 60);
+            ctx.shadowBlur = 0;
         }
 
         // Oyunu başlangıç durumuna getir
