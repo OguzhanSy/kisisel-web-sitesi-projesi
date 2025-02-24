@@ -379,6 +379,50 @@
             color: #888;
             font-size: 0.9em;
         }
+
+        /* Oyun stilleri */
+        .game-section {
+            padding: 50px 0;
+            text-align: center;
+            background: var(--card-bg);
+            margin-top: 50px;
+        }
+
+        .game-container {
+            max-width: 400px;
+            margin: 20px auto;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--accent);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        #gameCanvas {
+            display: block;
+            background: #000;
+        }
+
+        .game-controls {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+        }
+
+        .game-button {
+            padding: 10px 20px;
+            background: transparent;
+            border: 1px solid var(--accent);
+            color: var(--accent);
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .game-button:hover {
+            background: var(--accent);
+            color: #000;
+        }
     </style>
 </head>
 <body>
@@ -496,5 +540,168 @@
             </div>
         </div>
     </section>
+
+    <section class="game-section">
+        <div class="container">
+            <h2 class="section-title">Biraz Eğlence</h2>
+            <p style="margin-bottom: 20px; color: #888;">Yılan oyununu oynamak için Start'a tıklayın. Yön tuşlarıyla kontrol edin.</p>
+            <div class="game-container">
+                <canvas id="gameCanvas" width="400" height="400"></canvas>
+            </div>
+            <div class="game-controls">
+                <button class="game-button" onclick="startGame()">Start</button>
+                <button class="game-button" onclick="pauseGame()">Pause</button>
+            </div>
+        </div>
+    </section>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const box = 20;
+        let snake = [];
+        let score = 0;
+        let food = {};
+        let d = "";
+        let game = null;
+        let isPaused = false;
+
+        // Oyun başlangıç durumunu ayarla
+        function init() {
+            snake = [{
+                x: 10 * box,
+                y: 10 * box
+            }];
+            score = 0;
+            d = "";
+            createFood();
+            // Başlangıç ekranını çiz
+            ctx.fillStyle = "#000";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#00ff9d";
+            ctx.font = "20px Arial";
+            ctx.fillText("Press Start to play", canvas.width/2 - 80, canvas.height/2);
+        }
+
+        function createFood() {
+            food = {
+                x: Math.floor(Math.random() * 20) * box,
+                y: Math.floor(Math.random() * 20) * box
+            }
+        }
+
+        function drawGame() {
+            ctx.fillStyle = "#000";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            for(let i = 0; i < snake.length; i++) {
+                ctx.fillStyle = i === 0 ? "#00ff9d" : "#00b36b";
+                ctx.fillRect(snake[i].x, snake[i].y, box-2, box-2);
+            }
+            
+            ctx.fillStyle = "#ff0000";
+            ctx.fillRect(food.x, food.y, box-2, box-2);
+            
+            // Skor gösterimi
+            ctx.fillStyle = "#fff";
+            ctx.font = "20px Arial";
+            ctx.fillText("Score: " + score, 10, 30);
+            
+            let snakeX = snake[0].x;
+            let snakeY = snake[0].y;
+            
+            if(d === "LEFT") snakeX -= box;
+            if(d === "UP") snakeY -= box;
+            if(d === "RIGHT") snakeX += box;
+            if(d === "DOWN") snakeY += box;
+            
+            if(snakeX === food.x && snakeY === food.y) {
+                score++;
+                createFood();
+            } else {
+                snake.pop();
+            }
+            
+            let newHead = {
+                x: snakeX,
+                y: snakeY
+            }
+            
+            if(snakeX < 0 || snakeX > 19 * box || snakeY < 0 || snakeY > 19 * box || collision(newHead, snake)) {
+                clearInterval(game);
+                game = null;
+                ctx.fillStyle = "#000";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.fillStyle = "#ff0000";
+                ctx.font = "30px Arial";
+                ctx.fillText("Game Over!", canvas.width/2 - 80, canvas.height/2 - 30);
+                ctx.fillStyle = "#fff";
+                ctx.font = "20px Arial";
+                ctx.fillText("Score: " + score, canvas.width/2 - 40, canvas.height/2 + 10);
+                return;
+            }
+            
+            snake.unshift(newHead);
+        }
+
+        function collision(head, array) {
+            for(let i = 0; i < array.length; i++) {
+                if(head.x === array[i].x && head.y === array[i].y) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        document.addEventListener("keydown", direction);
+
+        function direction(event) {
+            // Yön tuşlarının sayfayı kaydırmasını engelle
+            if([37, 38, 39, 40].includes(event.keyCode)) {
+                event.preventDefault();
+            }
+            
+            let key = event.keyCode;
+            if(key === 37 && d !== "RIGHT") {
+                d = "LEFT";
+            } else if(key === 38 && d !== "DOWN") {
+                d = "UP";
+            } else if(key === 39 && d !== "LEFT") {
+                d = "RIGHT";
+            } else if(key === 40 && d !== "UP") {
+                d = "DOWN";
+            }
+        }
+
+        function startGame() {
+            if(!game) {
+                snake = [{x: 10 * box, y: 10 * box}];
+                score = 0;
+                d = "";
+                createFood();
+                game = setInterval(drawGame, 150); // Hızı biraz düşürdüm
+                isPaused = false;
+            }
+        }
+
+        function pauseGame() {
+            if(!isPaused && game) {
+                clearInterval(game);
+                game = null;
+                isPaused = true;
+                // Pause mesajı
+                ctx.fillStyle = "#00ff9d";
+                ctx.font = "30px Arial";
+                ctx.fillText("PAUSED", canvas.width/2 - 60, canvas.height/2);
+            } else if(isPaused) {
+                game = setInterval(drawGame, 150);
+                isPaused = false;
+            }
+        }
+
+        // Oyunu başlangıç durumuna getir
+        init();
+    </script>
 </body>
 </html>
